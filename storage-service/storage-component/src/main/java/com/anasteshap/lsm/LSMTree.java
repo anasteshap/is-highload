@@ -1,4 +1,4 @@
-package com.anasteshap.lms;
+package com.anasteshap.lsm;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

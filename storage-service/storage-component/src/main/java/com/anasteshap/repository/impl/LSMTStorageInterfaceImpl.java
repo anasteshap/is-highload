@@ -1,6 +1,6 @@
 package com.anasteshap.repository.impl;
 
-import com.anasteshap.lms.LSMTree;
+import com.anasteshap.lsm.LSMTree;
 import com.anasteshap.repository.StorageInterface;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;

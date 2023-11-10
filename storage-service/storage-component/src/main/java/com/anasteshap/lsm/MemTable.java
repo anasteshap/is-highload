@@ -1,6 +1,6 @@
-package com.anasteshap.lms;
+package com.anasteshap.lsm;
 
-import com.anasteshap.lms.utils.KeyValuePair;
+import com.anasteshap.lsm.utils.KeyValuePair;
 import lombok.Getter;
 
 import java.util.List;

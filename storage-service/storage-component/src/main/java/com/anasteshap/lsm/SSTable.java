@@ -1,9 +1,9 @@
-package com.anasteshap.lms;
+package com.anasteshap.lsm;
 
-import com.anasteshap.lms.iterator.IteratorMerger;
-import com.anasteshap.lms.iterator.UniqueSortedIterator;
-import com.anasteshap.lms.utils.KeyValuePair;
-import com.anasteshap.lms.utils.SparseIndex;
+import com.anasteshap.lsm.iterator.IteratorMerger;
+import com.anasteshap.lsm.iterator.UniqueSortedIterator;
+import com.anasteshap.lsm.utils.KeyValuePair;
+import com.anasteshap.lsm.utils.SparseIndex;
 import lombok.Getter;
 
 import java.io.*;

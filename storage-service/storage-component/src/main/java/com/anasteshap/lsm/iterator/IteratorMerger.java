@@ -1,4 +1,4 @@
-package com.anasteshap.lms.iterator;
+package com.anasteshap.lsm.iterator;
 
 import java.util.Iterator;
 import java.util.PriorityQueue;

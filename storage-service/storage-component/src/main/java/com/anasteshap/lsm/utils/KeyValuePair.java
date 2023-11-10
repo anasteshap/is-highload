@@ -1,4 +1,4 @@
-package com.anasteshap.lms.utils;
+package com.anasteshap.lsm.utils;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
