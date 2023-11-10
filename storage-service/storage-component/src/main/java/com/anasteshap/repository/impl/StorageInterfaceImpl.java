@@ -35,7 +35,6 @@ public class StorageInterfaceImpl implements StorageInterface {
                 }
             }
         } catch (IOException e) {
-//            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
@@ -46,7 +45,6 @@ public class StorageInterfaceImpl implements StorageInterface {
                 writer.write(entry.getKey() + " " + entry.getValue() + "\n");
             }
         } catch (IOException e) {
-//            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
