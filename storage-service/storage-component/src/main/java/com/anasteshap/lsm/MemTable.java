@@ -29,9 +29,9 @@ public class MemTable {
         var oldSize = oldValue != null ? key.length() * 2L + oldValue.length() * 2L : 0L;
 
         var newSize = currSize - oldSize + valueSize;
-        if (newSize > maxSize) {
-            throw new RuntimeException("Превышен размер MemTable");
-        }
+//        if (newSize > maxSize) {
+//            throw new RuntimeException("Превышен размер MemTable");
+//        }
 
         avlTree.put(key, value);
         currSize = newSize;
@@ -39,9 +39,9 @@ public class MemTable {
 
     public String get(String key) {
         var val = avlTree.get(key);
-        if (val == null) {
-            throw new RuntimeException("Ключ не найден");
-        }
+//        if (val == null) {
+//            throw new RuntimeException("Ключ не найден");
+//        }
         return val;
     }
 

@@ -10,7 +10,8 @@ public class ClientComponentImpl implements ClientComponent {
     private final WebClient webClient;
 
     public ClientComponentImpl(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.baseUrl("http://storage-service:8181").build();
+//        this.webClient = webClientBuilder.baseUrl("http://storage-service:8181").build();
+        this.webClient = webClientBuilder.baseUrl("http://localhost:8181").build();
     }
 
     public String get(String key) {

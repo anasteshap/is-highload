@@ -23,6 +23,12 @@ public class SSTable implements Iterable<KeyValuePair> {
     private long size;
     private final Map<String, SparseIndex> sparseIndexes = new TreeMap<>();
 
+    public SSTable(String filename, String journalPath) {
+        this.filename = filename;
+        this.journalPath = journalPath;
+        readSparseIndexesFromFile();
+    }
+
     public SSTable(String filename, String journalPath, MemTable memTable, int sampleSize) {
         this(filename, journalPath, memTable.getItems(), sampleSize);
     }
@@ -32,6 +38,42 @@ public class SSTable implements Iterable<KeyValuePair> {
         this.journalPath = journalPath;
         this.size = 0;
         writeItems(items, sampleSize);
+    }
+
+    private void readSparseIndexesFromFile() {
+        try (var reader = new BufferedReader(new FileReader(journalPath + INDEX_FILE_EXTENSION))) {
+            var buffer = new char[1];
+            var indexPart = new StringBuilder();
+            List<String> index = new ArrayList<>();
+            while ((reader.read(buffer)) != -1) {
+                if (buffer[0] == ':') {
+                    index.add(indexPart.toString());
+                    indexPart = new StringBuilder();
+                    continue;
+                }
+
+                if (buffer[0] == ';') {
+                    if (index.size() == 3) {
+                        long offset = Long.parseLong(index.get(1));
+                        long segLen = Long.parseLong(index.get(2));
+                        sparseIndexes.put(index.get(0), new SparseIndex(offset, segLen));
+                    }
+                    indexPart = new StringBuilder();
+                    continue;
+                }
+                indexPart.append(buffer[0]);
+            }
+
+            index.add(indexPart.toString());
+            if (index.size() == 3) {
+                long offset = Long.parseLong(index.get(1));
+                long segLen = Long.parseLong(index.get(2));
+                sparseIndexes.put(index.get(0), new SparseIndex(offset, segLen));
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void writeItems(List<KeyValuePair> items, int sampleSize) {
@@ -60,6 +102,7 @@ public class SSTable implements Iterable<KeyValuePair> {
                         curItemLine = curItemLine.substring(1);
                         isFirst = false;
                     }
+//                    var curItemLine = item.getKey() + ":" + item.getValue() + ";";
                     line.append(curItemLine);
 //                    bloomFilter.add(item.getKey());
                 }
@@ -82,11 +125,16 @@ public class SSTable implements Iterable<KeyValuePair> {
                 throw new RuntimeException("Список KeyValuePair пустой");
             }
 
+            isFirst = true;
             try (var journal = new FileOutputStream(journalPath + INDEX_FILE_EXTENSION, true)) {
-                var data = ";" + size + ";" + sparseIndexes.size(); // возможно не нужно
-                journal.write(data.getBytes());
+//                var data = ";" + size + ":" + sparseIndexes.size(); // возможно не нужно
+//                journal.write(data.getBytes());
                 for (var entry : sparseIndexes.entrySet()) {
                     var line = ";" + entry.getKey() + ":" + entry.getValue().getOffset() + ":" + entry.getValue().getSegLen();
+                    if (isFirst) {
+                        line = line.substring(1);
+                        isFirst = false;
+                    }
                     journal.write(line.getBytes());
                 }
             }
@@ -117,6 +165,7 @@ public class SSTable implements Iterable<KeyValuePair> {
 //            return null;
 
         var sparseIndex = ((TreeMap<String, SparseIndex>) sparseIndexes).floorEntry(key);
+        if (sparseIndex == null) return null;
         var offset = sparseIndex.getValue().getOffset();
         var segmentLen = sparseIndex.getValue().getSegLen();
 
@@ -161,16 +210,25 @@ public class SSTable implements Iterable<KeyValuePair> {
 
     private static class SSTableIterator implements Iterator<KeyValuePair> {
         private long tableSize;
-        private final BufferedReader bufferedReader;
+        private int count = 1;
+        //        private final BufferedReader bufferedReader;
+        private final InputStreamReader inputStreamReader;
+//        private final byte[] bufferedReader;
 
         public SSTableIterator(SSTable table) {
-            this.tableSize = table.size;
+//            this.tableSize = table.size;
             try {
-                var fis = new FileInputStream(table.filename);
+                var fis = new FileInputStream(table.filename + SSTable.DATA_FILE_EXTENSION);
                 var gzipInputStream = new GZIPInputStream(fis);
-                var reader = new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8);
-                bufferedReader = new BufferedReader(reader);
-                readNextLine();
+
+                var byteArrayOutputStream = new ByteArrayOutputStream();
+                var buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = gzipInputStream.read(buffer)) != -1) {
+                    byteArrayOutputStream.write(buffer, 0, bytesRead);
+                }
+                var byteArrayInputStream = new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+                inputStreamReader = new InputStreamReader(byteArrayInputStream);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -178,7 +236,8 @@ public class SSTable implements Iterable<KeyValuePair> {
 
         @Override
         public boolean hasNext() {
-            return tableSize > 0L;
+            return count != -1;
+//            return tableSize > 0L;
         }
 
         @Override
@@ -188,7 +247,7 @@ public class SSTable implements Iterable<KeyValuePair> {
             if (pair.length != 2) {
                 throw new RuntimeException("Проблемы с чтением файла. Невозможно идентифицировать ключ и значение");
             }
-            tableSize--;
+//            tableSize--;
             return new KeyValuePair(pair[0], pair[1]);
         }
 
@@ -196,7 +255,7 @@ public class SSTable implements Iterable<KeyValuePair> {
             var buffer = new char[1];
             try {
                 var stringBuilder = new StringBuilder();
-                while (bufferedReader.read(buffer) != -1) {
+                while ((count = inputStreamReader.read(buffer)) != -1) {
                     if (buffer[0] == ';') {
                         break;
                     }

@@ -13,7 +13,7 @@ public class IteratorMerger<T extends Comparable<T>> implements Iterator<T> {
     PriorityQueue<Pair<T, Integer>> queue; // мин-куча
 
     @SafeVarargs
-    public IteratorMerger(Iterator<T>... iterators) {
+    public IteratorMerger(Iterator<T>... iterators) { // SSTable передаются в порядке даты создания, начиная с недавней
         // iterators - список итераторов, каждый из которых указывает на SSTable
         this.iterators = iterators;
         queue = new PriorityQueue<>(comparing((Pair<T, Integer> a) -> a.getLeft()).thenComparingInt(Pair::getRight));
