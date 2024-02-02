@@ -1,11 +1,20 @@
 package com.anasteshap.lsm;
 
-import java.io.File;
+import com.anasteshap.lsm.memtable.MemTable;
+import com.anasteshap.lsm.memtable.MemTableInterface;
+import com.anasteshap.lsm.memtable.WAL;
+import com.anasteshap.lsm.utils.KeyValuePair;
+
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.zip.GZIPInputStream;
+
+import static java.nio.file.FileVisitOption.FOLLOW_LINKS;
 
 public class LSMTree {
     static final int DEFAULT_MEMTABLE_MAX_SIZE = 1 << 3; // для бд - 1 << 10
@@ -21,11 +30,11 @@ public class LSMTree {
     private final int tableLevelMaxSize;
     private final String directory;
 
-    MemTable mutableMemtable;
-    LinkedList<MemTable> immutableMemTables = new LinkedList<>();
+    WAL mutableMemtable;
+    LinkedList<WAL> immutableMemTables = new LinkedList<>();
     List<LinkedList<SSTable>> tables; // список уровней, каждый из которых - список SSTables
-    ExecutorService memTableFlusher = Executors.newFixedThreadPool(1);
-    ExecutorService tableCompactor = Executors.newFixedThreadPool(1);
+    ExecutorService memTableFlusher = Executors.newFixedThreadPool(2);
+    ExecutorService tableCompactor = Executors.newFixedThreadPool(2);
 
     public LSMTree() {
         this(DEFAULT_MEMTABLE_MAX_SIZE, DEFAULT_TABLE_LEVEL_MAX_SIZE, DEFAULT_DATA_DIRECTORY);
@@ -41,7 +50,7 @@ public class LSMTree {
 
     public LSMTree(int mutableMemTableMaxSize, int tableLevelMaxSize, String directory) {
         this.mutableMemTableMaxSize = mutableMemTableMaxSize;
-        this.mutableMemtable = new MemTable(mutableMemTableMaxSize);
+//        this.mutableMemtable = new MemTable(mutableMemTableMaxSize);
         this.tableLevelMaxSize = tableLevelMaxSize;
         this.directory = directory;
         this.tables = new ArrayList<>();
@@ -49,6 +58,7 @@ public class LSMTree {
         if (!Files.exists(path)) {
             try {
                 Files.createDirectory(path);
+                this.mutableMemtable = new WAL(new MemTable(mutableMemTableMaxSize), path.toString());
                 this.tables.add(new LinkedList<>()); // в другое место
                 System.out.println("Директория успешно создана.");
             } catch (Exception e) {
@@ -57,9 +67,72 @@ public class LSMTree {
         } else {
             System.out.println("Директория уже существует.");
 
+            List<String> walFilePaths = new ArrayList<>();
+            try {
+                Files.walk(path, FOLLOW_LINKS)
+                        .forEach(file -> {
+                            if(file.toFile().isFile() && file.toFile().getPath().endsWith(WAL.WAL_FILE_EXTENSION)){
+                                walFilePaths.add(file.toFile().getAbsolutePath());
+                            }
+                        });
+
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            if (!walFilePaths.isEmpty()) {
+                Path walPath = Path.of(walFilePaths.get(0));
+                var data = getDataFromWAL(walPath);
+                this.mutableMemtable = new WAL(new MemTable(mutableMemTableMaxSize, data), path.toString());
+                memTableFlusher.execute(this::checkMemTableSize);
+            } else {
+                this.mutableMemtable = new WAL(new MemTable(mutableMemTableMaxSize), path.toString());
+            }
             checkExistedSSTables(path);
-            compactTables();
+            tableCompactor.execute(this::compactTables);
         }
+    }
+
+    private Map<String, String> getDataFromWAL(Path walPath) {
+        Map<String, String> avlTree = new TreeMap<>();
+
+        try (var fis = new FileInputStream(walPath.toString());
+             var gzipInputStream = new GZIPInputStream(fis)) {
+
+            if (gzipInputStream.available() == 0) {
+                return avlTree;
+            }
+
+            var byteArrayOutputStream = new ByteArrayOutputStream();
+            var buffer = new byte[8192];
+            int bytesRead;
+
+            while ((bytesRead = gzipInputStream.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+            var byteArrayInputStream = new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+            var inputStreamReader = new InputStreamReader(byteArrayInputStream);
+
+            int charsRead = 0;
+            var charBuffer = new char[1];
+            var stringBuilder = new StringBuilder();
+            while (charsRead != -1) {
+                while ((charsRead = inputStreamReader.read(charBuffer)) != -1) {
+                    if (charBuffer[0] == ';') {
+                        break;
+                    }
+                    stringBuilder.append(charBuffer[0]);
+                }
+                var pair = stringBuilder.toString().split(":");
+                if (pair.length != 2) {
+                    throw new RuntimeException("Проблемы с чтением файла WAL. Невозможно идентифицировать ключ и значение");
+                }
+                avlTree.put(pair[0], pair[1]);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return avlTree;
     }
 
     private void checkExistedSSTables(Path path) {
@@ -69,7 +142,10 @@ public class LSMTree {
             return;
         }
 
-        for (var subDir : Arrays.stream(subDirectories).toList()) {
+        var subDirectoriesList = new ArrayList<>(List.of(subDirectories));
+        Collections.sort(subDirectoriesList);
+        for (var subDir : subDirectoriesList) {
+            System.out.println("+++++++++++++++++++++++++" + subDir.getName());
             Map<String, List<File>> fileMap = new HashMap<>();
             var files = subDir.listFiles(File::isFile);
             if (files == null) continue;
@@ -94,19 +170,13 @@ public class LSMTree {
             this.tables.add(newLevel);
         }
     }
+
     public void set(String key, String value) {
         synchronized (mutableMemTableLock) {
             mutableMemtable.add(key, value);
             checkMemTableSize();
         }
     }
-
-//    public void delete(String key) {
-//        synchronized (mutableMemTableLock) {
-//            mutableMemTable.(key);
-//            checkMemTableSize();
-//        }
-//    }
 
     public String get(String key) {
         String result;
@@ -140,18 +210,18 @@ public class LSMTree {
     private void checkMemTableSize() {
 //        if (mutableMemtable.getCurrSize() <= mutableMemTableMaxSize)
 //            return;
-        if (mutableMemtable.getCurrSize() < mutableMemTableMaxSize)
+        if (mutableMemtable.getMemTable().getCurrSize() < mutableMemTableMaxSize)
             return;
 
         synchronized (immutableMemTablesLock) {
             immutableMemTables.addFirst(mutableMemtable);
-            mutableMemtable = new MemTable(mutableMemTableMaxSize);
+            mutableMemtable = new WAL(new MemTable(mutableMemTableMaxSize), Path.of(directory).toString());
             memTableFlusher.execute(this::flushLastMemTable); // помещает задачу в очередь на выполнение в пуле потоков
         }
     }
 
     private void flushLastMemTable() {
-        MemTable memTableToFlush;
+        WAL memTableToFlush;
 
         synchronized (immutableMemTablesLock) {
             if (immutableMemTables.isEmpty())
@@ -176,8 +246,13 @@ public class LSMTree {
         String journalPath = String.format("%s%sjournal_%d", path, File.separator, ssTableId);
 
         synchronized (tableLock) {
-            tables.get(0).addFirst(new SSTable(filename, journalPath, memTableToFlush, DEFAULT_SSTABLE_SAMPLE_SIZE));
+            tables.get(0).addFirst(new SSTable(filename, journalPath, memTableToFlush.getMemTable(), DEFAULT_SSTABLE_SAMPLE_SIZE));
             tableCompactor.execute(this::compactTables);
+        }
+
+        var walFileName = memTableToFlush.getFilepath() + WAL.WAL_FILE_EXTENSION;
+        if (!new File(walFileName).delete()) {
+            throw new RuntimeException("Problems with deleting SSTable. Filename: " + walFileName);
         }
 
         // удаляем flushed memTable из immutable memTables

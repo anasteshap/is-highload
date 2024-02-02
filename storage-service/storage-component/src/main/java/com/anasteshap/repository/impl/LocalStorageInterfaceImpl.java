@@ -2,14 +2,13 @@ package com.anasteshap.repository.impl;
 
 import com.anasteshap.repository.StorageInterface;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Repository;
 
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
-@Repository
-public class StorageInterfaceImpl implements StorageInterface {
+//@Repository
+public class LocalStorageInterfaceImpl implements StorageInterface {
     @Value("${data.file.filename}")
     private String filename;
     private final Map<String, String> data = new HashMap<>();

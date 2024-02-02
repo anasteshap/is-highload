@@ -1,4 +1,4 @@
-package com.anasteshap;
+package com.anasteshap.config;
 
 import com.anasteshap.lsm.LSMTree;
 import org.springframework.context.annotation.Bean;

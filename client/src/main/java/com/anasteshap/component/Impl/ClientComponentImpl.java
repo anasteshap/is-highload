@@ -11,7 +11,8 @@ public class ClientComponentImpl implements ClientComponent {
 
     public ClientComponentImpl(WebClient.Builder webClientBuilder) {
 //        this.webClient = webClientBuilder.baseUrl("http://storage-service:8181").build();
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8181").build();
+        this.webClient = webClientBuilder.baseUrl("http://is-highload-storage-service-1:8181").build();
+//        this.webClient = webClientBuilder.baseUrl("http://localhost:8181").build();
     }
 
     public String get(String key) {

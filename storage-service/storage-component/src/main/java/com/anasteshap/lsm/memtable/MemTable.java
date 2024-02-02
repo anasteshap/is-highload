@@ -1,4 +1,4 @@
-package com.anasteshap.lsm;
+package com.anasteshap.lsm.memtable;
 
 import com.anasteshap.lsm.utils.KeyValuePair;
 import lombok.Getter;
@@ -7,16 +7,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-public class MemTable {
-    private final Map<String, String> avlTree = new TreeMap<>();
+public class MemTable implements MemTableInterface {
+    private final Map<String, String> avlTree;
     @Getter
     private final long maxSize;
     @Getter
-    private long currSize = 0L;
+    private long currSize;
 
     public MemTable(long maxSize) {
-        this.maxSize = maxSize;
+        this(maxSize, new TreeMap<>());
     }
+
+    public MemTable(long maxSize, Map<String, String> avlTree) {
+        this.maxSize = maxSize;
+        this.avlTree = avlTree;
+        this.currSize = 0L;
+        for (var entry : avlTree.entrySet()) {
+            this.currSize += entry.getKey().length() * 2L + entry.getValue().length() * 2L;
+        }
+    }
+
+//    public MemTable(long maxSize) {
+//        this.maxSize = maxSize;
+//    }
 
     public List<KeyValuePair> getItems() {
         return avlTree.entrySet().stream().map(item -> new KeyValuePair(item.getKey(), item.getValue())).toList();

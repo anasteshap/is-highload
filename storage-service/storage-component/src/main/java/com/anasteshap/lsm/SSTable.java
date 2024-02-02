@@ -2,6 +2,7 @@ package com.anasteshap.lsm;
 
 import com.anasteshap.lsm.iterator.IteratorMerger;
 import com.anasteshap.lsm.iterator.UniqueSortedIterator;
+import com.anasteshap.lsm.memtable.MemTable;
 import com.anasteshap.lsm.utils.KeyValuePair;
 import com.anasteshap.lsm.utils.SparseIndex;
 import lombok.Getter;

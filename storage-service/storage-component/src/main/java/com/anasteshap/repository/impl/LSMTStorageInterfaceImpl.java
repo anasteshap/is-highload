@@ -6,15 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
-@Primary
-@Repository
+//@Primary
+//@Repository
 public class LSMTStorageInterfaceImpl implements StorageInterface {
-    private final LSMTree lsmTree;
-
     @Autowired
-    public LSMTStorageInterfaceImpl(LSMTree lsmTree) {
-        this.lsmTree = lsmTree;
-    }
+    private LSMTree lsmTree;
 
     @Override
     public String get(String key) {

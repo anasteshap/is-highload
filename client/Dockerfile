@@ -4,4 +4,4 @@ WORKDIR /
 
 ADD build/libs/client-1.0-SNAPSHOT.jar /client.jar
 
-EXPOSE 8081
+#EXPOSE 8081
